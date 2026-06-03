@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "balltrack"
+version = "0.1.0"
+description = "Soccer ball position prediction in 1080p video"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ultralytics>=8.4.0",   # YOLO26 family; training + inference
+    "opencv-python>=4.10",  # video & image I/O
+    "pandas>=2.2",          # labels / predictions CSV
+    "numpy>=1.26",
+    "pyyaml>=6.0",          # config loading
+    "mlflow>=2.14",         # experiment tracking (train + eval metrics)
+    "filterpy>=1.4.5",      # Kalman filter (temporal post-processing)
+    "matplotlib>=3.8",      # EDA figures
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

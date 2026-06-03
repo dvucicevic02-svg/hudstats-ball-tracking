@@ -1,0 +1,146 @@
+<svg viewBox="0 0 780 1680" xmlns="http://www.w3.org/2000/svg" font-family="ui-sans-serif, system-ui, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <path d="M1,1 L9,5 L1,9 Z" fill="#94a3b8"/>
+    </marker>
+    <style>
+      .card{fill:#ffffff;stroke:#e2e8f0;stroke-width:1.5;rx:14;}
+      .lbl{fill:#0f172a;font-weight:700;font-size:16px;}
+      .sub{fill:#475569;font-size:12.5px;}
+      .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;fill:#0f172a;}
+      .tag{fill:#64748b;font-size:11px;font-weight:700;letter-spacing:1px;}
+      .key{fill:#b45309;font-weight:700;font-size:12.5px;}
+      .good{fill:#047857;font-size:12px;font-weight:600;}
+      .bad{fill:#b91c1c;font-size:12px;font-weight:600;}
+      .ax{stroke:#94a3b8;stroke-width:2;}
+    </style>
+  </defs>
+
+  <rect width="780" height="1680" fill="#f8fafc"/>
+  <text x="40" y="44" font-size="24" font-weight="800" fill="#0f172a">Pipeline jednog podatka: frejm 170</text>
+  <text x="40" y="68" class="sub" font-size="14">CSV red koji pratimo:  <tspan class="mono" font-size="14">170, 969, 470</tspan>  →  do reda u izlaznom part1.csv</text>
+
+  <!-- ===================== TRAINING PHASE ===================== -->
+  <rect x="40" y="90" width="700" height="30" rx="8" fill="#1e293b"/>
+  <text x="56" y="110" fill="#fff" font-size="14" font-weight="700">FAZA 1 — PRIPREMA + TRENING  (prepare_dataset.py → train.py)</text>
+
+  <!-- 1. RAW -->
+  <rect class="card" x="40" y="140" width="700" height="120" rx="14"/>
+  <text x="60" y="166" class="tag">1 · SIROVI ULAZ</text>
+  <text x="60" y="190" class="lbl">1080p frejm + jedan CSV red</text>
+  <text x="60" y="214" class="sub">Lopta je tačka (centar), realno ~12 px na 1920×1080.</text>
+  <text x="60" y="236" class="mono">part1.csv:  170, 969, 470</text>
+  <!-- mini frame -->
+  <rect x="478" y="152" width="240" height="96" rx="4" fill="#0f172a"/>
+  <rect x="486" y="160" width="60" height="16" rx="3" fill="#334155"/>
+  <circle cx="598" cy="194" r="4" fill="#f59e0b"/>
+  <text x="478" y="262" class="sub" font-size="10">1920×1080  ·  ball @ (969,470)</text>
+  <line x1="390" y1="260" x2="390" y2="288" class="ax" marker-end="url(#arrow)"/>
+
+  <!-- 2. POINT -> BOX -->
+  <rect class="card" x="40" y="290" width="700" height="106" rx="14"/>
+  <text x="60" y="316" class="tag">2 · TAČKA → BOX</text>
+  <text x="60" y="340" class="lbl">Detektor uči box, ne tačku</text>
+  <text x="60" y="362" class="sub">Fiksni ~24 px kvadrat oko centra (lopta je ~konstantne veličine).</text>
+  <text x="60" y="384" class="mono">class=0   cx=969  cy=470   w=24  h=24</text>
+  <rect x="640" y="312" width="60" height="60" rx="3" fill="none" stroke="#f59e0b" stroke-width="2"/>
+  <circle cx="670" cy="342" r="5" fill="#f59e0b"/>
+  <line x1="390" y1="396" x2="390" y2="424" class="ax" marker-end="url(#arrow)"/>
+
+  <!-- 3. CROP (KEY) -->
+  <rect class="card" x="40" y="426" width="700" height="208" rx="14" stroke="#f59e0b" stroke-width="2.5"/>
+  <text x="60" y="452" class="key" letter-spacing="1">3 · NATIVE-RES CROP  ★ KLJUČNA ODLUKA</text>
+  <text x="60" y="476" class="lbl">Lopta nikad ne sme da se smanji</text>
+  <text x="60" y="498" class="sub">Sečemo 640×640 prozor u IZVORNOJ rezoluciji oko lopte —</text>
+  <text x="60" y="516" class="sub">+ jitter (lopta nije uvek u centru)  + hard-negative kropovi (HUD, publika).</text>
+  <text x="60" y="540" class="mono">label (normalizovano na crop):  0  0.50  0.50  0.0375  0.0375</text>
+
+  <!-- bad vs good -->
+  <rect x="60" y="556" width="300" height="62" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="74" y="576" class="bad">✗ Naivno: ceo frejm → imgsz 640</text>
+  <rect x="300" y="568" width="44" height="44" rx="3" fill="#0f172a"/>
+  <circle cx="322" cy="590" r="2" fill="#f59e0b"/>
+  <text x="74" y="596" class="sub" font-size="11">lopta ~4 px → nestane u šumu</text>
+  <text x="74" y="611" class="sub" font-size="11">model uči nepostojeći signal</text>
+
+  <rect x="380" y="556" width="320" height="62" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="394" y="576" class="good">✓ Naše: native 640 crop</text>
+  <rect x="648" y="560" width="44" height="44" rx="3" fill="#0f172a"/>
+  <circle cx="670" cy="582" r="7" fill="#f59e0b"/>
+  <text x="394" y="596" class="sub" font-size="11">lopta ostaje ~12 px → oštra</text>
+  <text x="394" y="611" class="sub" font-size="11">i brže (mali ulaz)</text>
+  <line x1="390" y1="634" x2="390" y2="662" class="ax" marker-end="url(#arrow)"/>
+
+  <!-- 4. TEMPORAL SPLIT -->
+  <rect class="card" x="40" y="664" width="700" height="132" rx="14"/>
+  <text x="60" y="690" class="tag">4 · TEMPORALNI SPLIT  (ne random!)</text>
+  <text x="60" y="713" class="sub">Susedni frejmovi su skoro identični → random split curi i laže.</text>
+  <text x="60" y="731" class="sub">Delimo po vremenu + buffer od 300 frejmova. Frejm 170 pada u TRAIN.</text>
+  <!-- timeline -->
+  <rect x="60" y="748" width="520" height="22" rx="4" fill="#dbeafe"/>
+  <rect x="60" y="748" width="408" height="22" rx="4" fill="#bfdbfe"/>
+  <rect x="468" y="748" width="18" height="22" fill="#fde68a"/>
+  <rect x="486" y="748" width="94" height="22" rx="0" fill="#fecaca"/>
+  <text x="70" y="763" font-size="11" font-weight="700" fill="#1e3a8a">TRAIN  (3638)</text>
+  <text x="492" y="763" font-size="11" font-weight="700" fill="#7f1d1d">VAL (923)</text>
+  <text x="60" y="786" class="sub" font-size="10.5">frame 170 ───────────────────────────────────→ 22938 │buffer│ 23244 ──→ 28796</text>
+  <circle cx="64" cy="759" r="4" fill="#b45309"/>
+  <line x1="390" y1="796" x2="390" y2="824" class="ax" marker-end="url(#arrow)"/>
+
+  <!-- 5. TRAIN -->
+  <rect class="card" x="40" y="826" width="700" height="92" rx="14"/>
+  <text x="60" y="852" class="tag">5 · FINE-TUNE</text>
+  <text x="60" y="876" class="lbl">YOLO26n  (COCO weights → naša lopta)</text>
+  <text x="60" y="898" class="sub">~4.6k kropova + negativi  →  best.pt   ·   lightweight, sitni objekti (STAL)</text>
+  <rect x="600" y="844" width="100" height="52" rx="8" fill="#0f172a"/>
+  <text x="650" y="868" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">YOLO26n</text>
+  <text x="650" y="886" fill="#94a3b8" font-size="10" text-anchor="middle">best.pt</text>
+
+  <!-- ===================== INFERENCE PHASE ===================== -->
+  <rect x="40" y="948" width="700" height="30" rx="8" fill="#0e7490"/>
+  <text x="56" y="968" fill="#fff" font-size="14" font-weight="700">FAZA 2 — PREDIKCIJA  (predict.py: ROI + Kalman → part1.csv)</text>
+
+  <!-- 6. ROI -->
+  <rect class="card" x="40" y="998" width="700" height="116" rx="14"/>
+  <text x="60" y="1024" class="tag">6 · ROI-GUIDED  (gde da gledam?)</text>
+  <text x="60" y="1048" class="lbl">Kalman predviđa poziciju → sečem 640 prozor TAMO</text>
+  <text x="60" y="1070" class="sub">Ne skeniram ceo frejm. Ista native skala kao u treningu → brzo + tačno.</text>
+  <text x="60" y="1092" class="sub">(Na startu i posle velikih rupa: full-frame skan na imgsz=1920, bez smanjivanja.)</text>
+  <rect x="612" y="1014" width="88" height="84" rx="4" fill="#0f172a"/>
+  <rect x="636" y="1038" width="40" height="36" rx="3" fill="none" stroke="#22d3ee" stroke-width="2" stroke-dasharray="4 3"/>
+  <circle cx="656" cy="1056" r="6" fill="#f59e0b"/>
+  <text x="656" y="1110" class="sub" font-size="9.5" text-anchor="middle">ROI oko predikcije</text>
+  <line x1="390" y1="1114" x2="390" y2="1142" class="ax" marker-end="url(#arrow)"/>
+
+  <!-- 7. DETECT -->
+  <rect class="card" x="40" y="1144" width="700" height="100" rx="14"/>
+  <text x="60" y="1170" class="tag">7 · DETEKCIJA U ROI</text>
+  <text x="60" y="1194" class="lbl">YOLO vrati box → uzmem centar = sirova (x, y)</text>
+  <text x="60" y="1216" class="sub">Najpouzdanija detekcija u prozoru, pa koordinate vratim u 1080p prostor.</text>
+  <text x="60" y="1236" class="mono">raw detection:  (972, 468)   conf=0.91</text>
+  <line x1="390" y1="1244" x2="390" y2="1272" class="ax" marker-end="url(#arrow)"/>
+
+  <!-- 8. KALMAN GATE -->
+  <rect class="card" x="40" y="1274" width="700" height="150" rx="14" stroke="#0e7490" stroke-width="2.5"/>
+  <text x="60" y="1300" class="tag" fill="#0e7490">8 · KALMAN + OUTLIER GATE  ★ ČISTI REZULTAT</text>
+  <text x="60" y="1324" class="lbl">Zaglađivanje, odbacivanje nemogućih skokova, premošćavanje kratkih rupa</text>
+  <rect x="60" y="1338" width="320" height="68" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="74" y="1358" class="bad">✗ skok &gt; 40 px/frejm → ODBACI</text>
+  <text x="74" y="1377" class="sub" font-size="11">npr. lažna detekcija na radaru/HUD-u</text>
+  <text x="74" y="1393" class="sub" font-size="11">(EDA: p99 stvarnog kretanja = 16 px)</text>
+  <rect x="392" y="1338" width="308" height="68" rx="8" fill="#ecfeff" stroke="#a5f3fc"/>
+  <text x="406" y="1358" class="good" fill="#0e7490">✓ prihvati + zagladi</text>
+  <text x="406" y="1377" class="sub" font-size="11">kratke rupe (≤8) premosti Kalmanom</text>
+  <text x="406" y="1393" class="sub" font-size="11">velike rupe (scene cut) → preskoči</text>
+  <line x1="390" y1="1424" x2="390" y2="1452" class="ax" marker-end="url(#arrow)"/>
+
+  <!-- 9. OUTPUT -->
+  <rect class="card" x="40" y="1454" width="700" height="96" rx="14" fill="#0f172a" stroke="#0f172a"/>
+  <text x="60" y="1480" class="tag" fill="#7dd3fc">9 · IZLAZ</text>
+  <text x="60" y="1504" class="lbl" fill="#fff">part1.csv  —  jedan red po detektovanom frejmu</text>
+  <text x="60" y="1528" class="mono" fill="#7dd3fc">frame_no, ball_x, ball_y</text>
+  <text x="60" y="1544" class="mono" fill="#e2e8f0" font-size="13">170, 971, 469   ← naš podatak, zaglađen i upisan</text>
+
+  <text x="40" y="1588" class="sub" font-size="11.5">Isti tok važi za svaki frejm. Honest metrika (px greška, % &lt;10/20px) računa se SAMO na VAL delu.</text>
+  <text x="40" y="1608" class="sub" font-size="11.5">Tri ★ koraka su gde radimo bolje od naivnog „pusti YOLO na ceo frejm": native crop, temporalni split, Kalman gate.</text>
+</svg>
