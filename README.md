@@ -31,31 +31,70 @@ keeps its true size; full-frame reacquisition runs at `imgsz=1920` (no downscale
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 # place the data:
 #   data/part1.mp4   data/part1.csv
 ```
-
+clear
 ## Usage
 
 ```bash
-# 0. Look at the data first (prints reasoning + saves figures)
-python analysis/explore_dataset.py --labels data/part1.csv --fps 60
+# 1. Look at the data first (prints analysis conclusions + saves figures)
+python analysis/explore_dataset.py --labels data/received/part1.csv --fps 60
 
-# 1. Build the YOLO dataset (native-res crops + hard negatives, temporal split)
+# 2. Measure the ball size to justify box_size
+python analysis/measure_ball.py --video data/received/part1.mp4 --labels data/received/part1.csv
+
+# 3. Build the YOLO dataset (native-res crops + hard negatives, temporal split)
 python -m balltrack.prepare_dataset --config configs/default.yaml
 
-# 2. Train
+# 4. Visually verify the boxes/labels land on the ball before training
+python analysis/check_crops.py --dataset data/yolo --split train --n 16
+
+# 5. Train (GPU). Logs params/metrics/best.pt to MLflow automatically.
 python -m balltrack.train --config configs/default.yaml
-# 3. Predict (final deliverable; default output = part1.csv)
-python -m balltrack.predict data/part1.mp4 --output prediction.csv [--show]
-# 4. Evaluate (honest metrics on the held-out segment)
-python -m balltrack.evaluate --pred prediction.csv --gt data/part1.csv
+
+# 6. Predict -> prediction.csv
+python -m balltrack.predict data/received/part1.mp4 --output prediction.csv --weights runs/detect/outputs/train/yolo26n_ball/weights/best.pt
+
+# 7. Evaluate (honest metrics on the held-out segment only)
+python -m balltrack.evaluate --pred prediction.csv --gt data/received/part1.csv
+
+# 8. Visual check of detections live (green box tracks the ball)
+python -m balltrack.predict data/received/part1.mp4 --show \
+    --weights runs/detect/outputs/train/yolo26n_ball/weights/best.pt
 ```
 
 > The final predictor writes to `--output`, **default `part1.csv`** (spec-exact).
 > During development we use `--output prediction.csv` to avoid clobbering the
 > ground-truth file of the same name.
+
+---
+
+## Experiment tracking (MLflow)
+
+Both `train` and `evaluate` log to an MLflow tracking server automatically — no
+flags. Start the server first (in its own terminal):
+
+```bash
+mlflow server --backend-store-uri sqlite:///mlflow.db --host 127.0.0.1 --port 5000
+```
+
+This creates `mlflow.db` (the SQLite backend store) in the repo root, and the UI
+is viewable at <http://127.0.0.1:5000>. Training logs hyper-params, metrics and
+`best.pt`; evaluation logs the held-out pixel-error metrics — to the same
+`balltrack` experiment.
+
+The server URI is read from the `MLFLOW_TRACKING_URI` environment variable and
+defaults to `http://127.0.0.1:5000`; point it elsewhere to use a shared server:
+
+```bash
+# bash:        export MLFLOW_TRACKING_URI=http://my-host:5000
+# PowerShell:  $env:MLFLOW_TRACKING_URI = "http://my-host:5000"
+```
+
+If the server is not running, the run still completes — logging degrades to a
+printed warning instead of crashing.
 
 ---
 

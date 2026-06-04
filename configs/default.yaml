@@ -22,3 +22,7 @@ track:
   max_jump: 40.0        # EDA: p99 ~16 px/frame -> gate well above
   max_coast: 8
   conf: 0.25
+
+mlflow:
+  experiment: balltrack   # server URI is env-driven: MLFLOW_TRACKING_URI
+                          # (default http://127.0.0.1:5000)

@@ -12,8 +12,9 @@ Run:
 Notes
   * AMP (mixed precision) is on by default in Ultralytics and is ideal for the
     RTX 2060's Tensor cores — faster and lighter on the 6GB VRAM.
-  * MLflow logging is enabled so every run's hyper-params and metrics are tracked
-    and comparable while tuning. Disable with --no-mlflow if you want a bare run.
+  * MLflow logging is always on: hyper-params, metrics and the best weights are
+    logged to the tracking server (MLFLOW_TRACKING_URI, default
+    http://127.0.0.1:5000). If the server is down it degrades to a warning.
 """
 
 from __future__ import annotations
@@ -22,9 +23,10 @@ import argparse
 from pathlib import Path
 
 from balltrack.config import Config
+from balltrack.tracking import setup_mlflow
 
 
-def train(cfg: Config, use_mlflow: bool = True) -> Path:
+def train(cfg: Config) -> Path:
     # Imported lazily so that `prepare_dataset` / `evaluate` don't pull in torch.
     from ultralytics import YOLO
     from ultralytics import settings as ul_settings
@@ -35,8 +37,14 @@ def train(cfg: Config, use_mlflow: bool = True) -> Path:
             f"{dataset_yaml} not found. Run `python -m balltrack.prepare_dataset` first."
         )
 
-    # Ultralytics has native MLflow integration; just flip the global setting.
-    ul_settings.update({"mlflow": bool(use_mlflow)})
+    # Point MLflow at the tracking server BEFORE the ultralytics callback runs:
+    # it reads MLFLOW_TRACKING_URI / MLFLOW_EXPERIMENT_NAME from the environment,
+    # which setup_mlflow() has just exported. Returns None if unavailable.
+    tracking_uri = setup_mlflow(cfg.mlflow.experiment)
+
+    # Ultralytics has native MLflow integration; enable it (it then honours the
+    # URI/experiment set above). Off only when the server/library is unavailable.
+    ul_settings.update({"mlflow": tracking_uri is not None})
 
     model = YOLO(cfg.train.model)  # e.g. yolo26n.pt (downloads pretrained weights)
 
@@ -67,16 +75,29 @@ def train(cfg: Config, use_mlflow: bool = True) -> Path:
     print(f"\nTraining done. Best weights: {best}")
     print("Ultralytics val metrics (on the temporal hold-out) are in the run dir; "
           "for pixel-error on the full video pipeline, run balltrack.evaluate.")
+
+    # The ultralytics callback already uploads the run artifacts, but we log
+    # best.pt explicitly so the deployable weight is guaranteed to be attached
+    # under a predictable path. Guarded so a tracking outage can't fail training.
+    if tracking_uri is not None and best.exists():
+        try:
+            import mlflow
+
+            with mlflow.start_run(run_name="best-weights"):
+                mlflow.log_artifact(str(best), artifact_path="weights")
+            print(f"Logged best.pt to MLflow ({tracking_uri}).")
+        except Exception as exc:
+            print(f"(could not log best.pt to MLflow: {exc}; weights saved locally)")
+
     return best
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Fine-tune YOLO26n on the ball crops.")
     ap.add_argument("--config", type=Path, default=None)
-    ap.add_argument("--no-mlflow", action="store_true", help="Disable MLflow logging.")
     args = ap.parse_args()
     cfg = Config.from_yaml(args.config) if args.config else Config()
-    train(cfg, use_mlflow=not args.no_mlflow)
+    train(cfg)
 
 
 if __name__ == "__main__":

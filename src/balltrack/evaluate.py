@@ -24,6 +24,7 @@ import pandas as pd
 
 from balltrack.config import Config
 from balltrack.prepare_dataset import load_labels, temporal_split
+from balltrack.tracking import setup_mlflow
 
 
 def val_start_frame(gt: pd.DataFrame, cfg: Config) -> int:
@@ -33,8 +34,7 @@ def val_start_frame(gt: pd.DataFrame, cfg: Config) -> int:
     return int(val.min())
 
 
-def evaluate(pred_path: Path, gt_path: Path, cfg: Config,
-             use_mlflow: bool = True) -> dict:
+def evaluate(pred_path: Path, gt_path: Path, cfg: Config) -> dict:
     gt = load_labels(gt_path)
     pred = pd.read_csv(pred_path)
 
@@ -64,8 +64,7 @@ def evaluate(pred_path: Path, gt_path: Path, cfg: Config,
     }
 
     _print_report(metrics)
-    if use_mlflow:
-        _log_mlflow(metrics)
+    _log_mlflow(metrics, cfg.mlflow.experiment)
     return metrics
 
 
@@ -86,15 +85,20 @@ def _print_report(m: dict) -> None:
     print("=" * 58)
 
 
-def _log_mlflow(m: dict) -> None:
+def _log_mlflow(m: dict, experiment: str) -> None:
+    # Route through the shared helper so eval logs to the SAME server/experiment
+    # as training. Returns None (and prints why) if tracking is unavailable.
+    uri = setup_mlflow(experiment)
+    if uri is None:
+        return
     try:
         import mlflow
-    except ImportError:
-        print("(mlflow not installed; skipping logging)")
-        return
-    with mlflow.start_run(run_name="eval"):
-        mlflow.log_metrics({k: v for k, v in m.items()})
-    print("Logged metrics to MLflow (./mlruns).")
+
+        with mlflow.start_run(run_name="eval"):
+            mlflow.log_metrics({k: v for k, v in m.items()})
+        print(f"Logged eval metrics to MLflow ({uri}).")
+    except Exception as exc:  # server hiccup — the printed report above stands
+        print(f"(mlflow logging failed: {exc}; metrics above are still valid)")
 
 
 def main() -> None:
@@ -102,10 +106,9 @@ def main() -> None:
     ap.add_argument("--pred", type=Path, required=True)
     ap.add_argument("--gt", type=Path, default=Path("data/part1.csv"))
     ap.add_argument("--config", type=Path, default=None)
-    ap.add_argument("--no-mlflow", action="store_true")
     args = ap.parse_args()
     cfg = Config.from_yaml(args.config) if args.config else Config()
-    evaluate(args.pred, args.gt, cfg, use_mlflow=not args.no_mlflow)
+    evaluate(args.pred, args.gt, cfg)
 
 
 if __name__ == "__main__":
