@@ -79,20 +79,3 @@ src/balltrack/
 Reported **only on the held-out temporal split**: median & mean Euclidean pixel
 error, % of frames within 10px / 20px, and detection rate (coverage). The true
 test is the held-out `part2` the reviewers run `predict.py` on.
-
-
-# 0. setup (jednom)
-python -m venv .venv && .venv\Scripts\activate && pip install -e .
-
-# 1. analiza
-python analysis/explore_dataset.py --labels data/received/part1.csv --fps 60
-# 2. izmeri loptu
-python analysis/measure_ball.py --video data/received/part1.mp4 --labels data/received/part1.csv
-# 3. priprema  -> PA PROVERI KROPOVE
-python -m balltrack.prepare_dataset --config configs/default.yaml
-# 4. trening (GPU)
-python -m balltrack.train --config configs/default.yaml
-# 5. predikcija
-python -m balltrack.predict data/received/part1.mp4 --output prediction.csv
-# 6. evaluacija
-python -m balltrack.evaluate --pred prediction.csv --gt data/received/part1.csv

@@ -1,112 +1,92 @@
 """
-evaluate.py — honest accuracy of the predictions against ground truth.
+tracker.py — temporal post-processing for the per-frame detector.
 
-This is the number we report. It is computed ONLY on the held-out temporal
-segment (the last `val_fraction` of the timeline), i.e. frames the model never
-saw in training. Evaluating on the whole video would mix in training frames and
-inflate the result.
+A constant-velocity Kalman filter turns noisy, occasionally-wrong per-frame
+detections into a smooth, robust track. It does three jobs, all justified by the
+EDA (real motion ~2-3 px/frame, p99 ~16 px/frame, gaps are scene cuts):
 
-Metrics:
-  * median & mean Euclidean pixel error (median is robust to occasional misses)
-  * % of frames within 10px / 20px of ground truth
-  * detection rate: predicted frames / ground-truth frames, within the segment
+  1. SMOOTH    — average out detector jitter.
+  2. GATE      — reject detections that imply an impossible jump (> max_jump),
+                 e.g. a spurious hit on the radar / HUD / a player.
+  3. COAST     — when a frame has no usable detection, ride the prediction
+                 forward for up to `max_coast` frames (short occlusion), then
+                 give up (large gap = scene change -> we simply skip).
 
-    python -m balltrack.evaluate --pred prediction.csv --gt data/part1.csv
+The filter also tells the inference loop WHERE to look next, which drives the
+ROI crop in predict.py.
 """
 
 from __future__ import annotations
 
-import argparse
-from pathlib import Path
-
 import numpy as np
-import pandas as pd
-
-from balltrack.config import Config
-from balltrack.prepare_dataset import load_labels, temporal_split
+from filterpy.kalman import KalmanFilter
 
 
-def val_start_frame(gt: pd.DataFrame, cfg: Config) -> int:
-    """First frame of the held-out segment — identical split to training."""
-    kept = gt["frame_no"].values[:: cfg.data.subsample]
-    _, val = temporal_split(kept, cfg.data.val_fraction, cfg.data.split_buffer)
-    return int(val.min())
+class BallTracker:
+    def __init__(self, max_jump: float = 40.0, max_coast: int = 8, dt: float = 1.0):
+        self.max_jump = max_jump
+        self.max_coast = max_coast
 
+        # State = [x, y, vx, vy]; we measure [x, y].
+        kf = KalmanFilter(dim_x=4, dim_z=2)
+        kf.F = np.array([[1, 0, dt, 0],
+                         [0, 1, 0, dt],
+                         [0, 0, 1, 0],
+                         [0, 0, 0, 1]], dtype=float)
+        kf.H = np.array([[1, 0, 0, 0],
+                         [0, 1, 0, 0]], dtype=float)
+        # Measurement noise: detector centre is good to a couple of px.
+        kf.R = np.eye(2) * 3.0
+        # Process noise: scaled to ~2-3 px/frame real motion (EDA).
+        kf.Q = np.diag([1.0, 1.0, 4.0, 4.0])
+        kf.P = np.eye(4) * 500.0  # large initial uncertainty
+        self.kf = kf
 
-def evaluate(pred_path: Path, gt_path: Path, cfg: Config,
-             use_mlflow: bool = True) -> dict:
-    gt = load_labels(gt_path)
-    pred = pd.read_csv(pred_path)
+        self.initialized = False
+        self.coast = 0  # consecutive frames without an accepted measurement
 
-    start = val_start_frame(gt, cfg)
-    gt_v = gt[gt["frame_no"] >= start].set_index("frame_no")
-    pred_v = pred[pred["frame_no"] >= start].set_index("frame_no")
+    @property
+    def position(self) -> tuple[float, float]:
+        x = np.ravel(self.kf.x)  # filterpy may store state as a column vector
+        return float(x[0]), float(x[1])
 
-    # Pixel error only where BOTH have the frame.
-    common = gt_v.index.intersection(pred_v.index)
-    if len(common) == 0:
-        raise ValueError("No overlapping frames in the validation segment.")
-    dx = pred_v.loc[common, "ball_x"].values - gt_v.loc[common, "ball_x"].values
-    dy = pred_v.loc[common, "ball_y"].values - gt_v.loc[common, "ball_y"].values
-    err = np.hypot(dx, dy)
+    def predict(self) -> tuple[float, float]:
+        """Advance the state one frame; returns the predicted position (prior)."""
+        if not self.initialized:
+            return self.position
+        self.kf.predict()
+        return self.position
 
-    metrics = {
-        "val_start_frame": start,
-        "gt_frames": int(len(gt_v)),
-        "predicted_frames": int(len(pred_v)),
-        "matched_frames": int(len(common)),
-        "detection_rate": round(len(common) / len(gt_v), 4),
-        "median_px_error": round(float(np.median(err)), 2),
-        "mean_px_error": round(float(err.mean()), 2),
-        "p90_px_error": round(float(np.percentile(err, 90)), 2),
-        "pct_within_10px": round(float((err <= 10).mean() * 100), 1),
-        "pct_within_20px": round(float((err <= 20).mean() * 100), 1),
-    }
+    def is_outlier(self, meas: tuple[float, float]) -> bool:
+        """True if `meas` is too far from where the ball should be."""
+        if not self.initialized:
+            return False  # nothing to compare against yet
+        px, py = self.position
+        return float(np.hypot(meas[0] - px, meas[1] - py)) > self.max_jump
 
-    _print_report(metrics)
-    if use_mlflow:
-        _log_mlflow(metrics)
-    return metrics
+    def update(self, meas: tuple[float, float]) -> None:
+        """Accept a measurement and correct the state."""
+        if not self.initialized:
+            self.kf.x = np.array([meas[0], meas[1], 0.0, 0.0])
+            self.initialized = True
+        else:
+            self.kf.update(np.array(meas, dtype=float))
+        self.coast = 0
 
+    def mark_missing(self) -> bool:
+        """Call when no measurement was accepted this frame.
 
-def _print_report(m: dict) -> None:
-    print("\n" + "=" * 58)
-    print(" EVALUATION  (held-out temporal segment only)")
-    print("=" * 58)
-    print(f"  segment starts at frame : {m['val_start_frame']}")
-    print(f"  ground-truth frames     : {m['gt_frames']}")
-    print(f"  matched (both have it)  : {m['matched_frames']}")
-    print(f"  detection rate          : {m['detection_rate']*100:.1f}%")
-    print("  ---- localisation error (px) ----")
-    print(f"  median                  : {m['median_px_error']}")
-    print(f"  mean                    : {m['mean_px_error']}")
-    print(f"  p90                     : {m['p90_px_error']}")
-    print(f"  within 10px             : {m['pct_within_10px']}%")
-    print(f"  within 20px             : {m['pct_within_20px']}%")
-    print("=" * 58)
+        Returns True while the track is still alive (coasting), False once the
+        gap is too long to bridge — at which point the caller resets/skips.
+        """
+        self.coast += 1
+        return self.coast <= self.max_coast
 
+    @property
+    def alive(self) -> bool:
+        return self.initialized and self.coast <= self.max_coast
 
-def _log_mlflow(m: dict) -> None:
-    try:
-        import mlflow
-    except ImportError:
-        print("(mlflow not installed; skipping logging)")
-        return
-    with mlflow.start_run(run_name="eval"):
-        mlflow.log_metrics({k: v for k, v in m.items()})
-    print("Logged metrics to MLflow (./mlruns).")
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Evaluate predictions vs ground truth.")
-    ap.add_argument("--pred", type=Path, required=True)
-    ap.add_argument("--gt", type=Path, default=Path("data/part1.csv"))
-    ap.add_argument("--config", type=Path, default=None)
-    ap.add_argument("--no-mlflow", action="store_true")
-    args = ap.parse_args()
-    cfg = Config.from_yaml(args.config) if args.config else Config()
-    evaluate(args.pred, args.gt, cfg, use_mlflow=not args.no_mlflow)
-
-
-if __name__ == "__main__":
-    main()
+    def reset(self) -> None:
+        self.initialized = False
+        self.coast = 0
+        self.kf.P = np.eye(4) * 500.0

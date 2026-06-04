@@ -42,6 +42,13 @@ class DataConfig:
 
     seed: int = 1337
 
+    def __post_init__(self) -> None:
+        # YAML gives plain strings; force path fields to Path so `/` joins work
+        # regardless of whether the value came from code or from default.yaml.
+        self.video = Path(self.video)
+        self.labels = Path(self.labels)
+        self.out_dir = Path(self.out_dir)
+
 
 @dataclass
 class TrainConfig:
