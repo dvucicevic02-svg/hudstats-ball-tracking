@@ -77,7 +77,7 @@ class BallTracker:
         """Call when no measurement was accepted this frame.
 
         Returns True while the track is still alive (coasting), False once the
-        gap is too long to bridge — at which point the caller resets/skips.
+        gap is too long to bridge, at which point the caller resets/skips.
         """
         self.coast += 1
         return self.coast <= self.max_coast

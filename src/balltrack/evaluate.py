@@ -86,8 +86,6 @@ def _print_report(m: dict) -> None:
 
 
 def _log_mlflow(m: dict, experiment: str) -> None:
-    # Route through the shared helper so eval logs to the SAME server/experiment
-    # as training. Returns None (and prints why) if tracking is unavailable.
     uri = setup_mlflow(experiment)
     if uri is None:
         return
@@ -97,7 +95,7 @@ def _log_mlflow(m: dict, experiment: str) -> None:
         with mlflow.start_run(run_name="eval"):
             mlflow.log_metrics({k: v for k, v in m.items()})
         print(f"Logged eval metrics to MLflow ({uri}).")
-    except Exception as exc:  # server hiccup — the printed report above stands
+    except Exception as exc:
         print(f"(mlflow logging failed: {exc}; metrics above are still valid)")
 
 

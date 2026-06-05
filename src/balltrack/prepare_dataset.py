@@ -4,24 +4,24 @@ prepare_dataset.py — turn the raw video + centre-point labels into a YOLO data
 PIPELINE
     1. Load & validate labels.
     2. SUBSAMPLE (data is dense; near-identical frames add nothing).
-    3. TEMPORAL split into train/val (a random split would leak — see below).
+    3. TEMPORAL split into train/val (a random split would leak).
     4. For each kept frame: cut a native-resolution CROP around the ball
        (the ball must NOT be downscaled), convert the centre point to a YOLO
        box, and write image + label. Plus a fraction of HARD-NEGATIVE crops
-       (background only) so the model learns what is NOT a ball.
-    5. Emit dataset.yaml for Ultralytics.
+       (background only) so the model learns what is not a ball.
 
 WHY A TEMPORAL SPLIT
-    At 60fps the ball moves ~2px between frames, so frame t and t+1 are almost
-    the same image. A random train/val split puts near-duplicates on both sides,
+    At 60fps the ball moves ~2px between frames(based on 
+    analysis\explore_dataset.py),so frame T and T+1 are almost the same image.
+    A random train/val split puts near-duplicates on both sides,
     so the val score measures memorisation, not generalisation, and collapses on
-    the held-out `part2`. We therefore hold out a CONTIGUOUS block at the end of
+    the held-out `part2`. We therefore hold out a contiguous block at the end of
     the timeline, with a buffer band so train and val never touch.
 
-WHY SEQUENTIAL READING (not cap.set per frame)
-    Seeking by frame index (CAP_PROP_POS_FRAMES) is unreliable on many codecs —
+WHY SEQUENTIAL READING
+    Seeking by frame index (CAP_PROP_POS_FRAMES) is unreliable on many codecs,
     it snaps to the nearest keyframe, so the decoded frame may not be the one the
-    label refers to. For DATASET generation that silently corrupts labels. We
+    label refers to. For datasset generation that silently corrupts labels. We
     decode the video once, in order, and act on frames as we pass them.
 """
 
@@ -39,7 +39,7 @@ from balltrack.crop import crop_origin
 
 
 # --------------------------------------------------------------------------- #
-# Pure logic (no video, no I/O) — easy to unit-test.
+# Pure logic (no video, no I/O) — easy to unit-test
 # --------------------------------------------------------------------------- #
 def load_labels(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
@@ -113,7 +113,7 @@ def negative_window(
 
 
 # --------------------------------------------------------------------------- #
-# Dataset generation (touches the video).
+# Dataset generation (touches the video)
 # --------------------------------------------------------------------------- #
 def _write_example(
     img_dir: Path, lbl_dir: Path, name: str, crop: np.ndarray,
@@ -129,7 +129,7 @@ def generate_dataset(cfg: DataConfig) -> None:
     df = load_labels(cfg.labels)
     rng = np.random.default_rng(cfg.seed)
 
-    # Subsample, then temporally split (order matters: split the kept frames).
+    # Subsample, then temporally split (order matters: split the kept frames)
     kept = df["frame_no"].values[:: cfg.subsample]
     train_f, val_f = temporal_split(kept, cfg.val_fraction, cfg.split_buffer)
     split_of = {int(f): "train" for f in train_f}
@@ -163,8 +163,8 @@ def generate_dataset(cfg: DataConfig) -> None:
         split = split_of[idx]
         cx, cy = pos[idx]["ball_x"], pos[idx]["ball_y"]
 
-        # Positive crop (native resolution -> ball keeps its real size).
-        x0, y0 = crop_window(cx, cy, cfg.crop_size, cfg.jitter,
+        # Positive crop (native resolution -> ball keeps its real size)
+        x0, y0 = (cx, cy, cfg.crop_size, cfg.jitter,
                              cfg.frame_w, cfg.frame_h, rng)
         crop = frame[y0:y0 + cfg.crop_size, x0:x0 + cfg.crop_size]
         box = point_to_yolo_box(cx, cy, cfg.box_size, x0, y0,
@@ -200,11 +200,11 @@ def _write_dataset_yaml(cfg: DataConfig) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Build the YOLO dataset from video + labels.")
-    ap.add_argument("--config", type=Path, default=None, help="Optional YAML config.")
-    ap.add_argument("--video", type=Path, default=None)
-    ap.add_argument("--labels", type=Path, default=None)
-    ap.add_argument("--out-dir", type=Path, default=None)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", type=Path)
+    ap.add_argument("--video", type=Path)
+    ap.add_argument("--labels", type=Path)
+    ap.add_argument("--out-dir", type=Path)
     args = ap.parse_args()
 
     cfg = Config.from_yaml(args.config) if args.config else Config()

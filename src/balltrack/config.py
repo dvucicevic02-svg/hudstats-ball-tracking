@@ -73,10 +73,7 @@ class TrackConfig:
 
 @dataclass
 class MLflowConfig:
-    # The tracking-server URI is intentionally NOT here: it is environment-driven
-    # (MLFLOW_TRACKING_URI, default http://127.0.0.1:5000) so the same code runs
-    # against a local server, a shared one, or none. Only the experiment name,
-    # which is a project constant, lives in config. See tracking.setup_mlflow.
+
     experiment: str = "balltrack"
 
 

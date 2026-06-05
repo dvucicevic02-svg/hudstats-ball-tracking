@@ -1,9 +1,10 @@
 """
-measure_ball.py — measure the ball's pixel size, instead of guessing it.
+measure_ball.py — measure the ball's pixel size
 
-WHY
+WHY THIS FILE EXISTS
+--------------------
     The training box size (config: box_size) should match the real ball, but the
-    labels give only the ball CENTRE, not its size. This tool measures the ball
+    labels give only the ball centre, not its size. This script measures the ball
     on a sample of frames two ways:
       * AUTO   — around each labelled centre, find the bright ball blob and report
                  its diameter. Robust-ish; we report the MEDIAN over many frames.
@@ -58,7 +59,7 @@ def auto_diameter(gray_patch: np.ndarray) -> float | None:
             best_d, best = d, i
     if best is None:
         return None
-    # Diameter ~ average of the blob's width and height in pixels.
+    # Diameter - average of the blob's width and height in pixels.
     w = stats[best, cv2.CC_STAT_WIDTH]
     h = stats[best, cv2.CC_STAT_HEIGHT]
     return float((w + h) / 2)
@@ -85,14 +86,12 @@ def save_grid_crop(frame: np.ndarray, cx: int, cy: int, out: Path,
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Measure the ball's pixel size.")
+    ap = argparse.ArgumentParser()
     ap.add_argument("--video", type=Path, default=Path("data/received/part1.mp4"))
     ap.add_argument("--labels", type=Path, default=Path("data/received/part1.csv"))
-    ap.add_argument("--samples", type=int, default=40,
-                    help="How many labelled frames to sample across the video.")
+    ap.add_argument("--samples", type=int, default=40)
     ap.add_argument("--out", type=Path, default=Path("analysis/ball_size"))
-    ap.add_argument("--patch", type=int, default=40,
-                    help="Half-size (px) of the patch searched around the centre.")
+    ap.add_argument("--patch", type=int, default=40)
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
 
@@ -130,7 +129,7 @@ def main() -> None:
             diameters.append(d)
             print(f"frame {fno:>6}: ~{d:.1f} px")
 
-        # VISUAL crop for the first ~12 samples (enough to eyeball).
+        # VISUAL crop for the first ~12 samples.
         if saved < 12:
             save_grid_crop(frame, cx, cy, args.out / f"ball_f{fno:06d}.png")
             saved += 1
@@ -142,10 +141,10 @@ def main() -> None:
         print("\n" + "=" * 50)
         print(f"AUTO median diameter : {med:.1f} px  (n={len(diameters)})")
         print(f"suggested box_size   : {round(med * 2)} px  (~2x diameter)")
-        print(f"visual crops saved   : {args.out}/  — confirm by eye")
+        print(f"visual crops saved   : {args.out}")
         print("=" * 50)
     else:
-        print("\nNo automatic measurement succeeded — rely on the visual crops "
+        print("\nNo automatic measurement succeeded, rely on the visual crops "
               f"in {args.out}/ (count the ball's pixels on the grid).")
 
 

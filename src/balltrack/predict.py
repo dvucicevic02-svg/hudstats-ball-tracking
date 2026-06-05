@@ -126,13 +126,12 @@ def _draw(frame: np.ndarray, row: tuple[int, int, int] | None) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Predict ball positions in a video.")
-    ap.add_argument("video", type=Path, help="Path to the 1080p video.")
+    ap.add_argument("video", type=Path)
     ap.add_argument("--weights", type=Path,
                     default=Path("outputs/train/yolo26n_ball/weights/best.pt"))
     ap.add_argument("--config", type=Path, default=None)
-    ap.add_argument("--output", type=Path, default=Path("part1.csv"),
-                    help="Output CSV (default: part1.csv, per the brief).")
-    ap.add_argument("--show", action="store_true", help="Visualise frame-by-frame.")
+    ap.add_argument("--output", type=Path, default=Path("part1.csv"))
+    ap.add_argument("--show", action="store_true")
     args = ap.parse_args()
 
     cfg = Config.from_yaml(args.config) if args.config else Config()

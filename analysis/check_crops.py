@@ -1,14 +1,16 @@
 """
 check_crops.py — verify the prepared dataset by EYE.
 
+WHY THIS FILE EXISTS
+--------------------
 prepare_dataset.py writes crops (images) + YOLO labels (normalised 0-1 numbers).
 Those numbers are unreadable on their own. This script does the reverse of label
 creation: it reads each `.txt`, converts the normalised box back to pixels on its
 crop, and draws it — exactly like show_ball_dataset.py does on the full video,
 but adapted to our 640px crops and their own coordinate system.
 
-Open the saved images: the green box MUST sit on the ball. Hard-negative crops
-(empty .txt) get no box and should contain NO ball — that's correct.
+Open the saved images: the green box must sit on the ball. Hard-negative crops
+(empty .txt) get no box and should contain no ball, that's correct.
 
 RUN
     python analysis/check_crops.py --dataset data/yolo --split train --n 16
@@ -36,10 +38,10 @@ def draw_label(img, line: str):
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Eyeball-check prepared crops.")
+    ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", type=Path, default=Path("data/yolo"))
     ap.add_argument("--split", choices=["train", "val"], default="train")
-    ap.add_argument("--n", type=int, default=16, help="How many crops to render.")
+    ap.add_argument("--n", type=int, default=16,)
     ap.add_argument("--out", type=Path, default=Path("analysis/check_crops"))
     args = ap.parse_args()
 
@@ -66,7 +68,6 @@ def main() -> None:
         cv2.imwrite(str(args.out / f"{tag}_{p.stem}.png"), img)
 
     print(f"Rendered {len(picks)} crops -> {args.out}/  (positives={pos}, negatives={neg})")
-    print("Open them: the GREEN box must sit on the ball. NEG_* must have NO ball.")
 
 
 if __name__ == "__main__":
