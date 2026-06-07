@@ -21,30 +21,29 @@ class DataConfig:
     labels: Path = Path("data/part1.csv")
     out_dir: Path = Path("data/yolo")  # generated YOLO-format dataset
 
-    # --- video geometry (brief says 1080p) ---
+    # --- video geometry ---
     frame_w: int = 1920
     frame_h: int = 1080
 
     # --- sampling (EDA: data is dense -> drop redundant near-identical frames) ---
-    subsample: int = 6  # keep every Nth labelled frame for training
+    subsample: int = 6  # keep every 6th labelled frame for training (one frame per 0.1s)
 
-    # --- point -> box (labels are the ball CENTRE; YOLO needs boxes) ---
-    box_size: int = 24  # square side in px around the centre; ~ball diameter
+    # --- point converted to box (labels are the ball centre, YOLO needs boxes) ---
+    box_size: int = 24  # square side in px around the centre (EDA: median ball diameter is 11-12px)
 
-    # --- crops (KEY DECISION: train at native scale so the ball never shrinks) ---
+    # --- crops (train at native scale so the ball never shrinks) ---
     crop_size: int = 640        # square crop side in px, matches train imgsz
     jitter: float = 0.35        # max offset of ball from crop centre, as a fraction
     hard_negative_ratio: float = 0.25  # background-only crops (HUD/crowd) per positive
 
-    # --- temporal split (EDA: random split leaks; adjacent frames ~identical) ---
+    # --- temporal split (EDA: random split leaks, adjacent frames identical) ---
     val_fraction: float = 0.2   # last 20% of the timeline is held out
     split_buffer: int = 300     # frames dropped between train and val (no leakage)
 
-    seed: int = 1337
+    seed: int = 1337  # RNG seed for reproducible train/val split and crop jitter
 
     def __post_init__(self) -> None:
         # YAML gives plain strings; force path fields to Path so `/` joins work
-        # regardless of whether the value came from code or from default.yaml.
         self.video = Path(self.video)
         self.labels = Path(self.labels)
         self.out_dir = Path(self.out_dir)
@@ -52,18 +51,17 @@ class DataConfig:
 
 @dataclass
 class TrainConfig:
-    model: str = "yolo26n.pt"  # lightweight; STAL/ProgLoss help small targets
+    model: str = "yolo26n.pt"  # lightweight
     imgsz: int = 640
     epochs: int = 75
     batch: int = 16            # comfortable on a 6GB RTX 2060 at 640px
-    patience: int = 15         # early stopping
-    device: int | str = 0      # GPU 0; set "cpu" to force CPU
+    patience: int = 15         # early stopping, 15 epohas without improvment -> stop
+    device: int | str = 0      # CUDA GPU index (0 = first GPU); "cpu" to force CPU, "0,1" for multi-GPU
 
 
 @dataclass
 class TrackConfig:
     # EDA-derived: real motion ~2-3 px/frame, p99 ~16 px/frame.
-    # NOTE: the ROI crop size is NOT defined here — inference reuses
     # data.crop_size (single source of truth) so train/infer scale can't diverge.
     reacquire_imgsz: int = 1920    # full-frame scan = no downscaling -> ball stays sharp
     max_jump: float = 40.0         # outlier gate (px/frame); well above p99 -> kills HUD hits
@@ -73,7 +71,6 @@ class TrackConfig:
 
 @dataclass
 class MLflowConfig:
-
     experiment: str = "balltrack"
 
 

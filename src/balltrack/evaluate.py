@@ -1,7 +1,7 @@
 """
 evaluate.py — honest accuracy of the predictions against ground truth.
 
-This is the number we report. It is computed ONLY on the held-out temporal
+This is the number we report. It is computed only on the held-out temporal
 segment (the last `val_fraction` of the timeline), i.e. frames the model never
 saw in training. Evaluating on the whole video would mix in training frames and
 inflate the result.
@@ -48,7 +48,7 @@ def evaluate(pred_path: Path, gt_path: Path, cfg: Config) -> dict:
         raise ValueError("No overlapping frames in the validation segment.")
     dx = pred_v.loc[common, "ball_x"].values - gt_v.loc[common, "ball_x"].values
     dy = pred_v.loc[common, "ball_y"].values - gt_v.loc[common, "ball_y"].values
-    err = np.hypot(dx, dy)
+    err = np.hypot(dx, dy)  # per-frame Euclidean pixel distance: sqrt(dx^2 + dy^2)
 
     metrics = {
         "val_start_frame": start,

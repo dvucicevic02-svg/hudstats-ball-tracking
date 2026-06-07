@@ -2,8 +2,6 @@
 Exploratory Data Analysis — Soccer Ball Position dataset
 ==============================================================================
 
-WHY THIS FILE EXISTS
---------------------
 Before writing a single line of model code, we look at the data. Every design
 decision downstream (how we train, how we split, how we post-process, how we
 reject false positives) is justified by a measurable property of THIS dataset,

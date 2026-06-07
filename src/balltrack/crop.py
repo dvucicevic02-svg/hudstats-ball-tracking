@@ -4,11 +4,9 @@ crop.py — the SINGLE source of truth for crop geometry.
 Both data preparation (training) and inference (prediction) cut a square window
 around the ball at native resolution. If those two used different code or sizes,
 the detector would see the ball at one scale in training and another at
-inference — a silent, accuracy-killing mismatch. To make that impossible, BOTH
+inference, a silent, accuracy-killing mismatch. To make that impossible, both
 paths go through `crop_origin` / `extract_crop` here, with ONE `crop_size`.
 
-Training adds jitter (an augmentation) on top by perturbing the centre BEFORE
-calling these; inference calls them directly. The geometry itself is shared.
 """
 
 from __future__ import annotations

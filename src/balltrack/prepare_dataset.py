@@ -6,8 +6,8 @@ PIPELINE
     2. SUBSAMPLE (data is dense; near-identical frames add nothing).
     3. TEMPORAL split into train/val (a random split would leak).
     4. For each kept frame: cut a native-resolution CROP around the ball
-       (the ball must NOT be downscaled), convert the centre point to a YOLO
-       box, and write image + label. Plus a fraction of HARD-NEGATIVE crops
+       (the ball must not be downscaled), convert the centre point to a YOLO
+       box, and write image + label. Plus a fraction of hard-negative crops
        (background only) so the model learns what is not a ball.
 
 WHY A TEMPORAL SPLIT
@@ -87,9 +87,9 @@ def crop_window(
 ) -> tuple[int, int]:
     """Top-left of a `crop`x`crop` training window around (cx, cy).
 
-    Jitter (a TRAINING-only augmentation) pushes the ball off-centre so the model
+    Jitter (a traning-only augmentation) pushes the ball off-centre so the model
     doesn't learn "ball == middle". The actual window geometry then comes from the
-    SHARED `crop_origin`, so training and inference cannot diverge in scale.
+    shared `crop_origin`, so training and inference cannot diverge in scale.
     """
     max_off = jitter * crop / 2
     jx = cx + rng.uniform(-max_off, max_off)
@@ -164,7 +164,7 @@ def generate_dataset(cfg: DataConfig) -> None:
         cx, cy = pos[idx]["ball_x"], pos[idx]["ball_y"]
 
         # Positive crop (native resolution -> ball keeps its real size)
-        x0, y0 = (cx, cy, cfg.crop_size, cfg.jitter,
+        x0, y0 = crop_window(cx, cy, cfg.crop_size, cfg.jitter,
                              cfg.frame_w, cfg.frame_h, rng)
         crop = frame[y0:y0 + cfg.crop_size, x0:x0 + cfg.crop_size]
         box = point_to_yolo_box(cx, cy, cfg.box_size, x0, y0,

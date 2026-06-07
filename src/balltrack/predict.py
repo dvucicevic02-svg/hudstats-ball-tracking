@@ -4,13 +4,13 @@ predict.py — run the full pipeline on a video and write ball coordinates.
 For each frame:
   * If the track is alive, crop a native-resolution ROI around the Kalman
     prediction and detect there (fast, and the ball keeps its true size).
-  * Otherwise (start, or after a long gap) scan the FULL frame at imgsz=1920
+  * Otherwise (start, or after a long gap) scan the full frame at imgsz=1920
     (still no downscaling) to re-acquire the ball.
-  * Run the detection through the tracker's outlier gate; accept & smooth, or
-    coast across a short gap, or — if the gap is long — skip (scene change).
+  * Run the detection through the tracker's outlier gate, accept & smooth, or
+    coast across a short gap, or if the gap is long, skip (scene change).
 
 Output: a CSV `frame_no,ball_x,ball_y` (one row per frame with a position),
-written to --output, DEFAULT `part1.csv` (spec-exact). Use --show to watch the
+written to --output, default `prediction.csv` (spec-exact). Use --show to watch the
 detections frame-by-frame, in the style of show_ball_dataset.py.
 
     python -m balltrack.predict data/part1.mp4 --weights outputs/train/yolo26n_ball/weights/best.pt
@@ -45,7 +45,6 @@ def _best_detection(result, conf: float):
     i = int(confs.argmax())
     return float(xywh[i, 0]), float(xywh[i, 1]), float(confs[i])
 
-
 def predict(
     video: Path, weights: Path, cfg: Config, output: Path, show: bool = False
 ) -> Path:
@@ -58,8 +57,6 @@ def predict(
     cap = cv2.VideoCapture(str(video))
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open video: {video}")
-    W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or cfg.data.frame_w
-    H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or cfg.data.frame_h
 
     tracker = BallTracker(max_jump=t.max_jump, max_coast=t.max_coast)
     rows: list[tuple[int, int, int]] = []
@@ -77,9 +74,9 @@ def predict(
             crop, x0, y0 = extract_crop(frame, px, py, crop_size)
             det = _best_detection(model(crop, imgsz=crop_size, conf=t.conf,
                                         verbose=False)[0], t.conf)
-            meas = (x0 + det[0], y0 + det[1]) if det else None
+            meas = (x0 + det[0], y0 + det[1]) if det else None # measurement: map crop-local detection back to full-frame coords
         else:
-            # --- reacquisition: full frame, native scale (imgsz=1920) ---
+            # --- reacquisition: full frame, native scale (1920x1080) ---
             det = _best_detection(model(frame, imgsz=t.reacquire_imgsz,
                                         conf=t.conf, verbose=False)[0], t.conf)
             meas = (det[0], det[1]) if det else None
@@ -116,11 +113,11 @@ def predict(
 
 
 def _draw(frame: np.ndarray, row: tuple[int, int, int] | None) -> None:
-    """Overlay the detection in the style of show_ball_dataset.py."""
+    """Overlay the detection (for --show) in the style of show_ball_dataset.py"""
     if row is not None:
         _, bx, by = row
         cv2.rectangle(frame, (bx - 5, by - 5), (bx + 5, by + 5), (0, 255, 0), 2)
-    show_img = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)  # 1080p -> viewable
+    show_img = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
     cv2.imshow("Prediction (q to quit)", show_img)
 
 
@@ -130,7 +127,7 @@ def main() -> None:
     ap.add_argument("--weights", type=Path,
                     default=Path("outputs/train/yolo26n_ball/weights/best.pt"))
     ap.add_argument("--config", type=Path, default=None)
-    ap.add_argument("--output", type=Path, default=Path("part1.csv"))
+    ap.add_argument("--output", type=Path, default=Path("predict_n.csv"))
     ap.add_argument("--show", action="store_true")
     args = ap.parse_args()
 

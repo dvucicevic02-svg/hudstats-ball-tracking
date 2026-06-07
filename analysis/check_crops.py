@@ -1,8 +1,6 @@
 """
 check_crops.py — verify the prepared dataset by EYE.
 
-WHY THIS FILE EXISTS
---------------------
 prepare_dataset.py writes crops (images) + YOLO labels (normalised 0-1 numbers).
 Those numbers are unreadable on their own. This script does the reverse of label
 creation: it reads each `.txt`, converts the normalised box back to pixels on its

@@ -39,7 +39,8 @@ class BallTracker:
         kf.R = np.eye(2) * 3.0
         # Process noise: scaled to ~2-3 px/frame real motion (EDA).
         kf.Q = np.diag([1.0, 1.0, 4.0, 4.0])
-        kf.P = np.eye(4) * 500.0  # large initial uncertainty
+        # large initial uncertainty
+        kf.P = np.eye(4) * 500.0 
         self.kf = kf
 
         self.initialized = False
@@ -47,7 +48,7 @@ class BallTracker:
 
     @property
     def position(self) -> tuple[float, float]:
-        x = np.ravel(self.kf.x)  # filterpy may store state as a column vector
+        x = np.ravel(self.kf.x) 
         return float(x[0]), float(x[1])
 
     def predict(self) -> tuple[float, float]:

@@ -41,18 +41,19 @@ def train(cfg: Config) -> Path:
         imgsz=cfg.train.imgsz,
         epochs=cfg.train.epochs,
         batch=cfg.train.batch,
-        patience=cfg.train.patience,   # early stopping: guards against pixel-memorising
+        patience=cfg.train.patience,   # guards against pixel-memorising
         device=cfg.train.device,
-        amp=True,
+        amp=True,          # mixed precision (float16 insted of float32) -> faster, less VRAM on the 6GB 2060
         project="outputs/train",
         name="yolo26n_ball",
         exist_ok=True,
-        mosaic=1.0,
-        scale=0.5,
-        translate=0.1,
-        hsv_h=0.0, hsv_s=0.3, hsv_v=0.3,
-        fliplr=0.5,
-        flipud=0.0, # a flipped pitch is unnatural; keep vertical fixed
+        mosaic=1.0,        # stitch 4 images per sample -> ball seen in varied contexts/positions
+        scale=0.5,         # random zoom +/-50% -> robust to ball scale changes
+        translate=0.1,     # random shift up to 10% -> ball not always centred
+        hsv_h=0.0, hsv_s=0.3, hsv_v=0.3, # HSV colour jitter: hue off (ball is white, keep its colour)
+                                         # small saturation/value range to simulate different pitch lighting.
+        fliplr=0.5,        # horizontal flip 50%: pitch is left-right symmetric
+        flipud=0.0,        # no vertical flip: a flipped pitch is unnatural
         verbose=True,
     )
 
