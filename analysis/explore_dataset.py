@@ -9,7 +9,7 @@ not by a generic recipe. This script reproduces that analysis and prints, for
 each finding, the concrete engineering decision it drives.
 
 Run:
-    python analysis/explore_dataset.py --labels data/part1.csv --fps 60
+    python analysis/explore_dataset.py --labels data/received/part1.csv --fps 60
 
 Outputs:
     - A narrated report to stdout (numbers + the decision each one drives).

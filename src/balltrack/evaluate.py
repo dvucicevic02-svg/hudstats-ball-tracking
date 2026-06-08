@@ -11,7 +11,7 @@ Metrics:
   * % of frames within 10px / 20px of ground truth
   * detection rate: predicted frames / ground-truth frames, within the segment
 
-    python -m balltrack.evaluate --pred prediction.csv --gt data/part1.csv
+    python -m balltrack.evaluate --pred prediction_s.csv --gt data/received/part1.csv --config configs/default.yaml
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ def evaluate(pred_path: Path, gt_path: Path, cfg: Config) -> dict:
     }
 
     _print_report(metrics)
-    _log_mlflow(metrics, cfg.mlflow.experiment)
+    _log_mlflow(metrics, cfg.mlflow.experiment, cfg.train.size)
     return metrics
 
 
@@ -85,14 +85,14 @@ def _print_report(m: dict) -> None:
     print("=" * 58)
 
 
-def _log_mlflow(m: dict, experiment: str) -> None:
+def _log_mlflow(m: dict, experiment: str, size: str) -> None:
     uri = setup_mlflow(experiment)
     if uri is None:
         return
     try:
         import mlflow
 
-        with mlflow.start_run(run_name="eval"):
+        with mlflow.start_run(run_name=f"eval_{size}"):
             mlflow.log_metrics({k: v for k, v in m.items()})
         print(f"Logged eval metrics to MLflow ({uri}).")
     except Exception as exc:

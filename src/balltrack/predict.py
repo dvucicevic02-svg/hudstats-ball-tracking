@@ -10,11 +10,13 @@ For each frame:
     coast across a short gap, or if the gap is long, skip (scene change).
 
 Output: a CSV `frame_no,ball_x,ball_y` (one row per frame with a position),
-written to --output, default `prediction.csv` (spec-exact). Use --show to watch the
-detections frame-by-frame, in the style of show_ball_dataset.py.
+written to --output, default `prediction_<size>.csv` (derived from the config's
+train.size). Use --show to watch the detections frame-by-frame, in the style of
+show_ball_dataset.py (press q to quit).
 
-    python -m balltrack.predict data/part1.mp4 --weights outputs/train/yolo26n_ball/weights/best.pt
-    python -m balltrack.predict data/part1.mp4 --output prediction.csv --show
+    python -m balltrack.predict data/received/part1.mp4 \
+        --weights runs/detect/outputs/train/yolo26s_ball/weights/best.pt
+    python -m balltrack.predict data/received/part1.mp4 --output prediction_s.csv --show
 """
 
 from __future__ import annotations
@@ -124,15 +126,17 @@ def _draw(frame: np.ndarray, row: tuple[int, int, int] | None) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Predict ball positions in a video.")
     ap.add_argument("video", type=Path)
-    ap.add_argument("--weights", type=Path,
-                    default=Path("outputs/train/yolo26n_ball/weights/best.pt"))
+    ap.add_argument("--weights", type=Path, default=None)
     ap.add_argument("--config", type=Path, default=None)
-    ap.add_argument("--output", type=Path, default=Path("predict_n.csv"))
+    ap.add_argument("--output", type=Path, default=None)
     ap.add_argument("--show", action="store_true")
     args = ap.parse_args()
 
     cfg = Config.from_yaml(args.config) if args.config else Config()
-    predict(args.video, args.weights, cfg, args.output, show=args.show)
+    weights = args.weights or (
+        Path("outputs/train") / cfg.train.run_name / "weights" / "best.pt")
+    output = args.output or Path(f"prediction_{cfg.train.size}.csv")
+    predict(args.video, weights, cfg, output, show=args.show)
 
 
 if __name__ == "__main__":

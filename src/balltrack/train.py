@@ -1,14 +1,15 @@
 """
-train.py — fine-tune YOLO26n on the native-resolution ball crops.
+train.py — fine-tune YOLO26 on the native-resolution ball crops.
 
-We adapt a COCO-pretrained nano model ('lightweight', as the brief asks) to one
-class: `ball`. Training reads the dataset built by prepare_dataset.py (which
-already did the temporal train/val split), so Ultralytics' own val metrics here
-are computed on the held-out segment — not on memorised neighbours.
+We adapt a COCO-pretrained model to one class: `ball`. The variant is set by
+train.size in the config (n | s | m | l | x), so the same code trains any size
+and each run is named yolo26<size>_ball. Training reads the dataset built by
+prepare_dataset.py (which already did the temporal train/val split), so
+Ultralytics' own val metrics here are computed on the held-out segment, not on
+memorised neighbours.
 
 Run:
     python -m balltrack.train --config configs/default.yaml
-    
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ def train(cfg: Config) -> Path:
     tracking_uri = setup_mlflow(cfg.mlflow.experiment)
     ul_settings.update({"mlflow": tracking_uri is not None})
 
-    model = YOLO(cfg.train.model)  # yolo26n.pt (downloads pretrained weights)
+    model = YOLO(cfg.train.model)  # yolo26{size}.pt (downloads pretrained weights)
 
     results = model.train(
         data=str(dataset_yaml),
@@ -45,7 +46,7 @@ def train(cfg: Config) -> Path:
         device=cfg.train.device,
         amp=True,          # mixed precision (float16 insted of float32) -> faster, less VRAM on the 6GB 2060
         project="outputs/train",
-        name="yolo26n_ball",
+        name=cfg.train.run_name,   # yolo26{size}_ball -> per-variant folder + MLflow run
         exist_ok=True,
         mosaic=1.0,        # stitch 4 images per sample -> ball seen in varied contexts/positions
         scale=0.5,         # random zoom +/-50% -> robust to ball scale changes
@@ -64,7 +65,7 @@ def train(cfg: Config) -> Path:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Fine-tune YOLO26n on the ball crops.")
+    ap = argparse.ArgumentParser(description="Fine-tune YOLO26 on the ball crops.")
     ap.add_argument("--config", type=Path)
     args = ap.parse_args()
     cfg = Config.from_yaml(args.config) if args.config else Config()

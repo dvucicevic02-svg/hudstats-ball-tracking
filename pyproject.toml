@@ -17,7 +17,6 @@ dependencies = [
     "mlflow>=2.14",         # experiment tracking (train + eval metrics)
     "filterpy>=1.4.5",      # Kalman filter (temporal post-processing)
     "matplotlib>=3.8",      # EDA figures
-    "mlflow>=2.14"
 ]
 
 [tool.setuptools.packages.find]

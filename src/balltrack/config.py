@@ -51,12 +51,24 @@ class DataConfig:
 
 @dataclass
 class TrainConfig:
-    model: str = "yolo26n.pt"  # lightweight
+    size: str = "n"            # model variant: n | s | m | l | x (drives ALL naming)
     imgsz: int = 640
     epochs: int = 75
     batch: int = 16            # comfortable on a 6GB RTX 2060 at 640px
-    patience: int = 15         # early stopping, 15 epohas without improvment -> stop
+    patience: int = 15         # early stopping, 15 epochs without improvement -> stop
     device: int | str = 0      # CUDA GPU index (0 = first GPU); "cpu" to force CPU, "0,1" for multi-GPU
+
+    @property
+    def model(self) -> str:
+        """Pretrained weights file for this variant, e.g. 'yolo26x.pt'."""
+        return f"yolo26{self.size}.pt"
+
+    @property
+    def run_name(self) -> str:
+        """Shared name for the train output folder AND the MLflow run, so a
+        given variant's artifacts never collide with another's, e.g.
+        'yolo26x_ball'."""
+        return f"yolo26{self.size}_ball"
 
 
 @dataclass

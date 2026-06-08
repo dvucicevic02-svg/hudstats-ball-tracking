@@ -11,10 +11,10 @@ data:
   split_buffer: 300
 
 train:
-  model: yolo26n.pt
+  size: m              # model variant: n | s | m | l | x
   imgsz: 640
   epochs: 75
-  batch: 16             
+  batch: 4
   device: 0
 
 track:
