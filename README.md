@@ -63,6 +63,8 @@ harder frames (motion-blurred ball, ball on a white line, or in a crowd).
 ---
 
 ## Quick start
+> _Place the video and labels under `data/received/` first (`part1.mp4`, `part1.csv`)._
+
 
 ```bash
 # 1. Create and activate a virtual environment
@@ -82,7 +84,12 @@ python -m balltrack.predict data/received/part1.mp4 --show \
 
 The MLflow UI at <http://127.0.0.1:5000> shows the `n`, `s`, and `m` training
 runs and their evaluations together in the `balltrack` experiment. Select several
-and click **Compare** to put their metrics side by side.
+
+and click **Compare** to put their metrics side by side. It is also worth opening
+a training run's **Artifacts** tab to see the detailed plots of how training
+progressed (loss and metric curves, PR and F1 curves, confusion matrix) along
+with the other logged metrics, and the matching evaluation runs.
+
 
 ---
 
