@@ -1,7 +1,7 @@
 # --- data & generated artefacts (never commit large/derived files) ---
 #data/yolo/              
 #data/received/*.mp4     
-runs/                   
+#runs/                   
 #mlflow.db               
 prediction_*.csv
 /part1.csv              
@@ -20,4 +20,4 @@ venv/
 
 # --- editor / OS ---
 .vscode/
-.idea/
+.idea/*.pt
