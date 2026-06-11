@@ -13,7 +13,7 @@ EDA (real motion ~2-3 px/frame, p99 ~16 px/frame, gaps are scene cuts):
                  give up (large gap = scene change -> we simply skip).
 
 The filter also tells the inference loop WHERE to look next, which drives the
-ROI crop in predict.py.
+ROI crop in predictor.py.
 """
 
 from __future__ import annotations
@@ -23,24 +23,26 @@ from filterpy.kalman import KalmanFilter
 
 
 class BallTracker:
-    def __init__(self, max_jump: float = 40.0, max_coast: int = 8, dt: float = 1.0):
+    def __init__(self, max_jump: float = 40.0, max_coast: int = 8):
         self.max_jump = max_jump
         self.max_coast = max_coast
 
-        # State = [x, y, vx, vy]; we measure [x, y].
+        # State = [x, y, vx, vy]; we measure [x, y]. One step = one frame,
+        # so velocity is in px/frame and elapsed time is counted in steps.
         kf = KalmanFilter(dim_x=4, dim_z=2)
-        kf.F = np.array([[1, 0, dt, 0],
-                         [0, 1, 0, dt],
+        kf.F = np.array([[1, 0, 1, 0],
+                         [0, 1, 0, 1],
                          [0, 0, 1, 0],
                          [0, 0, 0, 1]], dtype=float)
         kf.H = np.array([[1, 0, 0, 0],
                          [0, 1, 0, 0]], dtype=float)
-        # Measurement noise: detector centre is good to a couple of px.
+        # R: doubt in the yolo detector — small, its centre is good to ~2px.
         kf.R = np.eye(2) * 3.0
-        # Process noise: scaled to ~2-3 px/frame real motion (EDA).
+        # Q: how fast truth can change — position barely, velocity more
+        # sized to the EDA's ~2-3 px/frame real motion.
         kf.Q = np.diag([1.0, 1.0, 4.0, 4.0])
-        # large initial uncertainty
-        kf.P = np.eye(4) * 500.0 
+        # P: initial uncertainty — huge, so first measurements dominate.
+        kf.P = np.eye(4) * 500.0
         self.kf = kf
 
         self.initialized = False
@@ -51,19 +53,26 @@ class BallTracker:
         x = np.ravel(self.kf.x) 
         return float(x[0]), float(x[1])
 
-    def predict(self) -> tuple[float, float]:
-        """Advance the state one frame; returns the predicted position (prior)."""
+    def predict(self, n_steps: int = 1) -> tuple[float, float]:
+        """Advance the state `n_steps` frames; returns the predicted position.
+
+        `n_steps` > 1 means the source dropped frames since the last call
+        (live mode); the filter must propagate through them or its prediction
+        lags behind the real ball.
+        """
         if not self.initialized:
             return self.position
-        self.kf.predict()
+        for _ in range(n_steps):
+            self.kf.predict()
         return self.position
 
-    def is_outlier(self, meas: tuple[float, float]) -> bool:
-        """True if `meas` is too far from where the ball should be."""
+    def is_outlier(self, meas: tuple[float, float], n_steps: int = 1) -> bool:
+        """True if `meas` is too far from where the ball should be.
+        """
         if not self.initialized:
             return False  # nothing to compare against yet
         px, py = self.position
-        return float(np.hypot(meas[0] - px, meas[1] - py)) > self.max_jump
+        return float(np.hypot(meas[0] - px, meas[1] - py)) > self.max_jump * n_steps
 
     def update(self, meas: tuple[float, float]) -> None:
         """Accept a measurement and correct the state."""
@@ -74,13 +83,10 @@ class BallTracker:
             self.kf.update(np.array(meas, dtype=float))
         self.coast = 0
 
-    def mark_missing(self) -> bool:
+    def mark_missing(self, n_steps: int = 1) -> bool:
         """Call when no measurement was accepted this frame.
-
-        Returns True while the track is still alive (coasting), False once the
-        gap is too long to bridge, at which point the caller resets/skips.
         """
-        self.coast += 1
+        self.coast += n_steps
         return self.coast <= self.max_coast
 
     @property

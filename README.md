@@ -46,7 +46,7 @@ one's output:
 2. **Prepare the dataset** (`prepare_dataset.py`): cut native-resolution crops, convert each centre point to a normalised YOLO box, subsample, jitter, add hard negatives, and split temporally.
 3. **Verify the crops** (`check_crops.py`): draw the YOLO boxes back onto the saved crops, so you can confirm by eye that the box lands on the ball, and that hard negatives contain no ball, before spending a training run on them.
 4. **Train** (`train.py`): fine-tune a COCO-pretrained YOLO26 model, adapting it to a single ball class. Hyper-parameters, metrics, and `best.pt` are logged to MLflow through `tracking.py`.
-5. **Predict** (`predict.py`): run the model over the whole video. The ROI tracker and Kalman filter (`tracker.py`) predict where the ball should be, so we crop an ROI there and detect at native scale; impossible jumps are rejected and short gaps are bridged. Output is the CSV.
+5. **Predict**: run the model over the video. The per-frame core (`predictor.py`) uses the ROI tracker and Kalman filter (`tracker.py`) to predict where the ball should be, crops an ROI there and detects at native scale; impossible jumps are rejected and short gaps are bridged. Two drivers share this one core: **offline** (`predict.py`) processes every frame in order, and **real-time** (`realtime.py`) replays the video at its native FPS like a live camera — if the model cannot keep up, stale frames are dropped (latency stays bounded) and the tracker is told how many frames really passed (`n_steps`), so its per-frame limits stay honest. Both stream rows to the CSV as they are produced.
 6. **Evaluate** (`evaluate.py`): compare against ground truth, but only on the held-out temporal segment the model never saw, which is the only honest measure. The metrics are logged to MLflow through `tracking.py`.
 
 Steps 2 and 5 both cut their crops through the same `crop.py` (one shared crop
@@ -76,9 +76,17 @@ pip install -e .
 # 3. Start the MLflow tracking server (in its own terminal)
 mlflow server --backend-store-uri sqlite:///mlflow.db --host 127.0.0.1 --port 5000
 
-# 4. Predict with the s model and watch it live (press q to quit)
+# 4. Predict with the s model — two variants of the same per-frame core:
+
+# 4a. OFFLINE: every frame, in order -> the full CSV (add --show to watch)
 python -m balltrack.predict data/received/part1.mp4 --show \
     --output prediction_s.csv \
+    --weights runs/detect/outputs/train/yolo26s_ball/weights/best.pt
+
+# 4b. REAL-TIME: replay at native FPS like a live camera; frames the model
+#     can't keep up with are dropped (drop % in the window, q to quit)
+python -m balltrack.realtime data/received/part1.mp4 \
+    --output live.csv \
     --weights runs/detect/outputs/train/yolo26s_ball/weights/best.pt
 ```
 
@@ -123,9 +131,10 @@ python -m balltrack.predict data/received/part1.mp4 \
 # 7. Evaluate (honest metrics on the held-out segment only, logs as eval_<size>)
 python -m balltrack.evaluate --pred prediction_s.csv --gt data/received/part1.csv --config configs/default.yaml
 
-# 8. Visual check of detections live (green box tracks the ball, press q to quit)
-python -m balltrack.predict data/received/part1.mp4 --show \
-    --output prediction_s.csv \
+# 8. Real-time variant: replay the video at native FPS like a live camera
+#    (green box tracks the ball, drop % in the corner, press q to quit)
+python -m balltrack.realtime data/received/part1.mp4 \
+    --output live.csv \
     --weights runs/detect/outputs/train/yolo26s_ball/weights/best.pt
 ```
 
@@ -141,8 +150,11 @@ src/balltrack/
   crop.py                     shared crop geometry (train + infer)
   prepare_dataset.py          video+labels -> YOLO dataset
   train.py                    YOLO26 fine-tune + MLflow
-  tracker.py                  ROI + Kalman post-processing
-  predict.py                  video -> CSV (+ --show)
+  tracker.py                  Kalman filter: smooth, gate, coast
+  predictor.py                per-frame core (ROI + reacquire), shared by both modes
+  sources.py                  frame sources: file iterator, paced latest-frame reader
+  predict.py                  offline: video -> CSV (+ --show)
+  realtime.py                 live replay: native-FPS window + CSV, bounded latency
   evaluate.py                 pixel-error metrics + MLflow
   tracking.py                 MLflow server setup
 ```

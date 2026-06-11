@@ -19,7 +19,7 @@ train:
 
 track:
   reacquire_imgsz: 1920
-  max_jump: 40.0       
+  max_jump: 40.0
   max_coast: 8
   conf: 0.25
 
