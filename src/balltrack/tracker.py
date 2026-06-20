@@ -23,7 +23,7 @@ from filterpy.kalman import KalmanFilter
 
 
 class BallTracker:
-    def __init__(self, max_jump: float = 40.0, max_coast: int = 8):
+    def __init__(self, max_jump: float = 25.0, max_coast: int = 8):
         self.max_jump = max_jump
         self.max_coast = max_coast
 
